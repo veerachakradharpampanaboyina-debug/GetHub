@@ -37,14 +37,19 @@ const prompt = ai.definePrompt({
 
   Your task is to generate a set of {{numQuestions}} unique, non-repeating questions for a practice exam on the topic of "{{examTopic}}".
 
-  The questions should be a mix of "multipleChoice", "trueFalse", and "freeText" types.
+  The questions MUST be a balanced mix of the following types:
+  - At least 40% should be "multipleChoice" questions (with exactly 4 options each).
+  - At least 30% should be "trueFalse" questions (no options, answer is either "True" or "False").
+  - At least 30% should be "freeText" questions (open-ended, no options, require a written answer).
+  If the number of questions does not divide evenly, round up for multipleChoice, then trueFalse, then freeText.
   - Base the questions on the official syllabus and past question patterns for the "{{examTopic}}".
   - For "multipleChoice" questions, provide exactly 4 options.
   - For "trueFalse" questions, do not provide options.
-  - Ensure the "correctAnswer" is one of the provided options for multiple choice questions.
+  - For "freeText" questions, do not provide options.
+  - Ensure the "correctAnswer" is one of the provided options for multiple choice questions, or "True"/"False" for trueFalse, or a model answer for freeText.
   - Assign pointsPossible for each question, for example 10 points for objective and 20 for free text.
   - Ensure every question has a unique questionId, like "q1", "q2", etc.
-  
+
   {{#if seenQuestions}}
   Most importantly, DO NOT repeat any of the following questions that the user has already seen:
   {{#each seenQuestions}}
@@ -52,7 +57,7 @@ const prompt = ai.definePrompt({
   {{/each}}
   {{/if}}
 
-  Generate the questions now.
+  Generate the questions now. Ensure the required mix of question types is present in the output.
   `,
 });
 

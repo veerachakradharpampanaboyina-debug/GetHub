@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import GethubLogo from '@/components/gethub-logo';
 
 function LoginPage() {
@@ -150,7 +150,9 @@ function LoginPage() {
 export default function LoginPageWrapper() {
   return (
     <AuthProvider>
-      <LoginPage />
+      <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+        <LoginPage />
+      </Suspense>
     </AuthProvider>
   );
 }

@@ -57,7 +57,7 @@ function AdminPage() {
       router.push('/login?redirect=/admin');
     }
     // Simple admin check, in a real app this should be based on roles in a database
-    if (!loading && user && user.email !== 'admin@gethub.com') {
+    if (!loading && user && user.email !== 'pydah.edu@gmail.com') {
         toast({
             title: "Access Denied",
             description: "You do not have permission to access the admin page.",
@@ -170,7 +170,7 @@ function AdminPage() {
   };
 
 
-  if (loading || !user || user.email !== 'admin@gethub.com') {
+  if (loading || !user || user.email !== 'pydah.edu@gmail.com') {
     return (
       <div className="flex h-screen items-center justify-center">
         <LoaderCircle className="w-12 h-12 animate-spin text-primary" />

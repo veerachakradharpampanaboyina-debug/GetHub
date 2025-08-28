@@ -15,9 +15,19 @@ import wav from 'wav';
 import { Buffer } from 'buffer';
 import { RATE_LIMIT_EXCEEDED_AUDIO } from '@/assets/rate-limit-exceeded';
 
+
+// Only 1 male and 1 female voice (supported by Gemini TTS)
+const VOICES = [
+  'algenib', // Male
+  'schedar', // Female
+];
+
 const TextToSpeechInputSchema = z.object({
   text: z.string().describe('The text to be converted to speech.'),
-  voice: z.enum(['Algenib', 'Schedar']).optional().default('Algenib').describe('The pre-built voice to use for the speech. Algenib is male, Schedar is female.'),
+  voice: z.enum([
+    'algenib', // Male
+    'schedar', // Female
+  ]).optional().default('algenib').describe('The pre-built voice to use for the speech.'),
 });
 export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
 
@@ -47,7 +57,7 @@ async function toWav(
 
     let bufs: Buffer[] = [];
     writer.on('error', reject);
-    writer.on('data', function (d) {
+    writer.on('data', function (d: Buffer) {
       bufs.push(d);
     });
     writer.on('end', function () {

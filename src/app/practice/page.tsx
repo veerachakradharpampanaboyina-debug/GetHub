@@ -221,7 +221,7 @@ function PracticeExamGenerator() {
             <SidebarTrigger className="md:hidden" />
              <h1 className="text-xl font-semibold flex items-center gap-3">
                 <BrainCircuit className="w-6 h-6"/>
-                AI Practice Exam
+                GETHUB Practice Exam
             </h1>
           </div>
         </header>
@@ -230,7 +230,7 @@ function PracticeExamGenerator() {
               <div className="flex flex-col items-center justify-center text-center gap-4">
                   <LoaderCircle className="w-12 h-12 animate-spin text-primary" />
                   <h1 className="text-2xl font-bold">Generating Your Practice Exam...</h1>
-                  <p className="text-muted-foreground">The AI is preparing {numQuestions} questions for the {topic} exam.</p>
+                  <p className="text-muted-foreground">The GETHUB is preparing {numQuestions} questions for the {topic} exam.</p>
               </div>
           ) : exam ? (
             <ExamView exam={exam} />

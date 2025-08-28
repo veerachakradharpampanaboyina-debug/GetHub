@@ -41,8 +41,15 @@ type Message = {
   isGenerating?: boolean;
 };
 
+// Extend window type to include SpeechRecognition and webkitSpeechRecognition
+declare global {
+  interface Window {
+    SpeechRecognition?: any;
+    webkitSpeechRecognition?: any;
+  }
+}
 const SpeechRecognition =
-  (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition));
+  (typeof window !== 'undefined' && (window.SpeechRecognition || (window as any).webkitSpeechRecognition));
   
 const nativeLanguages = [
   'Telugu', 'Hindi', 'Tamil', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi', 'Spanish', 'French', 'German', 'Mandarin Chinese', 'Japanese', 'Korean', 'Russian'
@@ -57,7 +64,8 @@ function CommunicationPracticePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voice, setVoice] = useState<TextToSpeechInput['voice']>('Algenib');
+  const [micDelay, setMicDelay] = useState(false);
+  const [voice, setVoice] = useState<TextToSpeechInput['voice']>('algenib');
   const [nativeLanguage, setNativeLanguage] = useState<string>('Telugu');
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -116,13 +124,34 @@ function CommunicationPracticePage() {
     try {
       const feedbackResult = await generateCommunicationFeedback({ text, nativeLanguage });
       const aiResponseText = feedbackResult.response;
-          
       if (aiResponseText.trim()) {
-        const ttsResult = await textToSpeech({ text: aiResponseText, voice });
-              
-        setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: aiResponseText, isGenerating: false } : m));
-        playAudio(ttsResult.audioDataUri);
-  
+        // Only call TTS if text is not empty or too short
+        let ttsResult = null;
+        if (aiResponseText.trim().length > 2) {
+          try {
+            ttsResult = await textToSpeech({ text: aiResponseText, voice });
+            console.log('TTS audioDataUri:', ttsResult.audioDataUri);
+            if (!ttsResult.audioDataUri || ttsResult.audioDataUri.length < 30) {
+              toast({ title: "TTS Error", description: "No audio could be generated for this response. (Debug: Empty or too short audioDataUri)", variant: "destructive" });
+            } else {
+              playAudio(ttsResult.audioDataUri);
+            }
+          } catch (ttsErr) {
+            console.error('TTS Error:', ttsErr);
+            let errMsg = '';
+            if (ttsErr instanceof Error) {
+              errMsg = ttsErr.message;
+            } else if (typeof ttsErr === 'object' && ttsErr !== null && 'message' in ttsErr) {
+              errMsg = (ttsErr as any).message;
+            } else {
+              errMsg = String(ttsErr);
+            }
+            toast({ title: "TTS Error", description: `Text-to-speech failed. Please try again. (Debug: ${errMsg})`, variant: "destructive" });
+          }
+        }
+        // Replace visible 'AI', 'Ai', or 'ai' with 'GETHUB' in the assistant's response
+        const gethubResponse = aiResponseText.replace(/\bAI\b|\bAi\b|\bai\b/g, 'GETHUB');
+        setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: gethubResponse, isGenerating: false } : m));
       } else {
         setMessages(prev => prev.filter(m => m.id !== assistantMessageId));
       }
@@ -167,7 +196,7 @@ function CommunicationPracticePage() {
             }
         };
 
-        recognition.onresult = (event) => {
+  recognition.onresult = (event: any) => {
            if (speechTimeoutRef.current) {
                 clearTimeout(speechTimeoutRef.current);
            }
@@ -190,7 +219,7 @@ function CommunicationPracticePage() {
           sendFinalTranscript(); 
         };
 
-        recognition.onerror = (event) => {
+  recognition.onerror = (event: any) => {
           if (event.error !== 'no-speech' && event.error !== 'aborted') {
             toast({ title: "Speech Recognition Error", description: `Error: ${event.error}`, variant: "destructive"});
           }
@@ -209,20 +238,25 @@ function CommunicationPracticePage() {
             setIsSpeaking(true);
         };
 
-        audioRef.current.onended = () => {
-            setIsSpeaking(false);
-        };
+    audioRef.current.onended = () => {
+      setMicDelay(true);
+      setTimeout(() => {
+        setIsSpeaking(false);
+        setMicDelay(false);
+      }, 1000);
+    };
 
-        audioRef.current.onerror = (e) => {
-            const target = e.target as HTMLAudioElement;
-            // Error code 20 is a DOMException for abort, which is expected if we interrupt playback.
-            if (target.error && target.error.code !== 20) { 
-                console.error("Audio element error:", e);
-                toast({ title: "Audio Error", description: "Could not play the audio response.", variant: "destructive" });
-            }
-            // Always ensure speaking state is reset, even on error.
-            setIsSpeaking(false);
-        };
+    audioRef.current.onerror = (e) => {
+      // e can be Event or string (per OnErrorEventHandler)
+      const target = (e && typeof e !== 'string' && 'currentTarget' in e) ? (e.currentTarget as HTMLAudioElement) : null;
+      // Error code 20 is a DOMException for abort, which is expected if we interrupt playback.
+      if (target && target.error && target.error.code !== 20) { 
+        console.error("Audio element error:", e);
+        toast({ title: "Audio Error", description: "Could not play the audio response.", variant: "destructive" });
+      }
+      // Always ensure speaking state is reset, even on error.
+      setIsSpeaking(false);
+    };
       }
 
       return () => {
@@ -381,7 +415,7 @@ function CommunicationPracticePage() {
             <SidebarTrigger className="md:hidden" />
              <h1 className="text-xl font-semibold flex items-center gap-3">
                 <MessageCircle className="w-6 h-6"/>
-                AI Language Coach
+                GETHUB Language Coach
             </h1>
           </div>
           <div className="flex items-center gap-6">
@@ -398,17 +432,17 @@ function CommunicationPracticePage() {
                   </SelectContent>
               </Select>
             </div>
-            <RadioGroup value={voice} onValueChange={(v) => setVoice(v as TextToSpeechInput['voice'])} className="flex items-center gap-4" disabled={isUIActive}>
-              <Label>Voice:</Label>
-              <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Algenib" id="male-voice" />
-                  <Label htmlFor="male-voice">John</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Schedar" id="female-voice" />
-                  <Label htmlFor="female-voice">Emma</Label>
-              </div>
-            </RadioGroup>
+      <RadioGroup value={voice} onValueChange={(v) => setVoice(v as TextToSpeechInput['voice'])} className="flex items-center gap-4" disabled={isUIActive}>
+        <Label>Voice:</Label>
+        <div className="flex items-center space-x-2">
+            <RadioGroupItem value="algenib" id="male-voice" />
+            <Label htmlFor="male-voice">Male (algenib)</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+            <RadioGroupItem value="schedar" id="female-voice" />
+            <Label htmlFor="female-voice">Female (schedar)</Label>
+        </div>
+      </RadioGroup>
           </div>
         </header>
         <main className="flex flex-col h-[calc(100vh-61px)]">
@@ -435,7 +469,7 @@ function CommunicationPracticePage() {
                                 <span>GETHUB is thinking...</span>
                               </div>
                            ) : (
-                             <div className="prose prose-sm prose-invert max-w-none text-current" dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }} />
+                             <div className="prose prose-sm prose-invert max-w-none text-current" dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content.replace(/\bAI\b|\bAi\b|\bai\b/g, 'GETHUB')) }} />
                            )}
                            {message.role === 'assistant' && !message.isGenerating && (
                             <div className="flex gap-2 mt-3 -mb-2">
@@ -447,7 +481,7 @@ function CommunicationPracticePage() {
                         </div>
                         {message.role === 'user' && (
                             <Avatar className="w-8 h-8">
-                                <AvatarImage src={user.photoURL ?? 'https://placehold.co/100x100.png'} alt="@user" data-ai-hint="student portrait" />
+                                <AvatarImage src={user.photoURL ?? 'https://placehold.co/100x100.png'} alt="@user" data-gethub-hint="student portrait" />
                                 <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
                             </Avatar>
                         )}
@@ -472,8 +506,8 @@ function CommunicationPracticePage() {
                           type="button" 
                           size="icon" 
                           variant={isRecording ? "destructive" : "ghost"}
-                          onClick={handleToggleRecording}
-                          disabled={isGenerating || isSpeaking}
+                          onClick={() => { if (!isSpeaking && !micDelay) handleToggleRecording(); }}
+                          disabled={isGenerating || isSpeaking || micDelay}
                       >
                           <Mic className="w-5 h-5" />
                       </Button>

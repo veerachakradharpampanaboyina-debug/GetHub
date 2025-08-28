@@ -51,6 +51,22 @@ import { generateSyllabusNotes } from '@/ai/flows/generate-syllabus-notes';
 import jsPDF from 'jspdf';
 import { Separator } from '@/components/ui/separator';
 import { markdownToHtml } from '@/lib/utils';
+
+// Utility to convert markdown to plain text (for PDF export)
+function markdownToPlainText(markdown: string): string {
+  // Remove headings, bold, italics, code, and lists, keep line breaks
+  return markdown
+    .replace(/^#+\s?/gm, '') // Remove markdown headings
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Bold
+    .replace(/__(.*?)__/g, '$1') // Bold
+    .replace(/\*(.*?)\*/g, '$1') // Italics
+    .replace(/_(.*?)_/g, '$1') // Italics
+    .replace(/`([^`]+)`/g, '$1') // Inline code
+    .replace(/^\s*[-*+] /gm, '• ') // Unordered lists
+    .replace(/^\s*\d+\. /gm, match => match.replace(/\d+\./, n => n + '.')) // Ordered lists
+    .replace(/\r?\n/g, '\n') // Normalize line breaks
+    .replace(/\n{3,}/g, '\n\n'); // Max 2 line breaks
+}
 import { getLatestScheduledExam } from '@/services/scheduled-exam-service';
 import { useToast } from '@/hooks/use-toast';
 
@@ -101,11 +117,10 @@ function ExamSyllabusPageComponent({ exam }: { exam: ExamDetails }) {
   };
   
   const handleDownloadPdf = () => {
-    const content = notesContentRef.current;
-    if (!content) {
+    if (!generatedNotes) {
       toast({
         title: 'Download Error',
-        description: 'Could not find the content to download.',
+        description: 'No notes to download.',
         variant: 'destructive',
       });
       return;
@@ -117,30 +132,43 @@ function ExamSyllabusPageComponent({ exam }: { exam: ExamDetails }) {
     });
 
     const pdf = new jsPDF('p', 'pt', 'a4');
-    
-    pdf.html(content, {
-      callback: function (doc) {
-        try {
-          doc.save(`${currentTopic.replace(/\s+/g, '_').toLowerCase()}_notes.pdf`);
-        } catch (error) {
-            console.error("Failed to save PDF:", error);
-            toast({
-                title: "PDF Generation Failed",
-                description: "There was an issue saving the PDF. Please try again.",
-                variant: "destructive"
-            });
-        }
-      },
-      x: 15,
-      y: 15,
-      autoPaging: 'text',
-      html2canvas: {
-          scale: 0.8, 
-          useCORS: true,
-          logging: false,
-      },
-       margin: [10, 10, 10, 10],
-    });
+    const margin = 40;
+    const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+    const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+    const fontSize = 12;
+    pdf.setFont('Times', '');
+    pdf.setFontSize(fontSize);
+
+    // Title
+    pdf.setFontSize(16);
+    pdf.text(currentTopic, margin, margin);
+    pdf.setFontSize(fontSize);
+
+    // Convert markdown to plain text
+    const plainText = markdownToPlainText(generatedNotes);
+    // Split text into lines that fit the page width
+    const lines = pdf.splitTextToSize(plainText, pageWidth);
+
+    let y = margin + 30;
+    for (let i = 0; i < lines.length; i++) {
+      if (y > pageHeight) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.text(lines[i], margin, y);
+      y += fontSize + 2;
+    }
+
+    try {
+      pdf.save(`${currentTopic.replace(/\s+/g, '_').toLowerCase()}_notes.pdf`);
+    } catch (error) {
+      console.error("Failed to save PDF:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "There was an issue saving the PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   if (loading || !user || hasWeeklyExam === null) {
